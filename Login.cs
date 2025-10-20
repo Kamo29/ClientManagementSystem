@@ -1,154 +1,147 @@
-public partial class Login : Form
+namespace ClientManagementSystem.Presentation
 {
-    private DataConn db = new DataConn();
-    public Login()
+    public partial class Login : Form
     {
-        InitializeComponent();
-    }
-
-    private void bttnLogin_Click(object sender, EventArgs e)
-    {
-        string username = txtUsername.Text;
-        string password = txtPassword.Text;
-        string role = "";
-        int userId = 0;
-
-        if (autenticate(username, password, role))
+        private DataConn db = new DataConn();
+        public Login()
         {
-            // Log the login action
-            string ipAddress = GetClientIPAddress();
-            ActionLogger logger = new ActionLogger();
-            logger.LogAction(userId, "User logged in", ipAddress);
+            InitializeComponent();
         }
 
-        if (autenticate(username, password,  role))
+        private void bttnLogin_Click(object sender, EventArgs e)
         {
-            if (role.Equals(radioAdmin))
+            string username = txtUsername.Text;
+            string password = txtPassword.Text;
+            string role = "";
+            int userId = 0;
+
+            if (autenticate(username, password, role))
             {
-                new adminDash().Show();
-                this.Hide();
+                // Log the login action
+                string ipAddress = GetClientIPAddress();
+                ActionLogger logger = new ActionLogger();
+                logger.LogAction(userId, "User logged in", ipAddress);
             }
 
-            else
+            if (autenticate(username, password,  role))
             {
-                new agentDash().Show();
-                this.Hide();
-            }
-        }
-    }
-
-    private bool autenticate(string username, string pass, string role)
-    {
-        using (SqlConnection conn = db.getConn())
-        {
-            conn.Open();
-            string query = "SELECT PasswordHash, Role FROM Users WHERE Username = @username";
-            SqlCommand cmd = new SqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@username", username);
-            
-            SqlDataReader reader = cmd.ExecuteReader();
-            if (reader.HasRows)
-            {
-                reader.Read();
-                string hashedPassword = reader["PasswordHash"].ToString(); role = reader["Role"].ToString();
-                
-                if (VerifyPassword( pass, storedHash: hashedPassword))
+                if (role.Equals(radioAdmin))
                 {
-                    // Login successful
-                    MessageBox.Show("Login successful");
-                    // Redirect to the appropriate page based on the user's role
-                    if (role == "Admin")
+                    new adminDash().Show();
+                    this.Hide();
+                }
+
+                else
+                {
+                    new agentDash().Show();
+                    this.Hide();
+                }
+            }
+        }
+
+        private bool autenticate(string username, string pass, string role)
+        {
+            using (SqlConnection conn = db.getConn())
+            {
+                conn.Open();
+                string query = "SELECT PasswordHash, Role FROM Users WHERE Username = @username";
+                SqlCommand cmd = new SqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@username", username);
+                
+                SqlDataReader reader = cmd.ExecuteReader();
+                if (reader.HasRows)
+                {
+                    reader.Read();
+                    string hashedPassword = reader["PasswordHash"].ToString(); role = reader["Role"].ToString();
+                    
+                    if (VerifyPassword( pass, storedHash: hashedPassword))
                     {
-                        adminDash aD = new adminDash();
-                        aD.Show();
-                        this.Hide();
+                        // Login successful
+                        MessageBox.Show("Login successful");
+                        // Redirect to the appropriate page based on the user's role
+                        if (role == "Admin")
+                        {
+                            adminDash aD = new adminDash();
+                            aD.Show();
+                            this.Hide();
+                        }
+                        else if (role == "User")
+                        {
+                            agentDash agD = new agentDash();
+                            agD.Show();
+                            this.Hide();
+                        }
                     }
-                    else if (role == "User")
+                    else
                     {
-                        agentDash agD = new agentDash();
-                        agD.Show();
-                        this.Hide();
+                        // Login failed
+                        MessageBox.Show("Login failed. Incorrect password.");
                     }
                 }
                 else
                 {
                     // Login failed
-                    MessageBox.Show("Login failed. Incorrect password.");
+                    MessageBox.Show("Login failed. User not found.");
                 }
             }
-            else
+
+            return true;
+        }
+
+        private bool VerifyPassword(string password, string storedHash)
+        {
+            // For simplicity, assuming the storedHash is created using SHA256
+            using (SHA256 sha256 = SHA256.Create())
             {
-                // Login failed
-                MessageBox.Show("Login failed. User not found.");
+                byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+                string hashString = BitConverter.ToString(hashBytes).Replace("-", "");
+                return hashString == storedHash;
             }
         }
 
-        return true;
-    }
-
-    private bool VerifyPassword(string password, string storedHash)
-    {
-        // For simplicity, assuming the storedHash is created using SHA256
-        using (SHA256 sha256 = SHA256.Create())
+        private string GetClientIPAddress()
         {
-            byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            string hashString = BitConverter.ToString(hashBytes).Replace("-", "");
-            return hashString == storedHash;
+            // Dummy implementation for Windows Forms.
+            return "127.0.0.1"; // Replace with logic to fetch the actual client IP if applicable
         }
-    }
 
-    private string GetClientIPAddress()
-    {
-        // Dummy implementation for Windows Forms.
-        return "127.0.0.1"; // Replace with logic to fetch the actual client IP if applicable
-    }
-
-    public class ActionLogger
-    {
-        private string connectionString = "YourConnectionStringHere";
-
-        public void LogAction(int userId, string action, string ipAddress = null)
+        public class ActionLogger
         {
-            try
+            private string connectionString = "YourConnectionStringHere";
+
+            public void LogAction(int userId, string action, string ipAddress = null)
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                try
                 {
-                    connection.Open();
-                    string query = @"
-                    INSERT INTO ActionLogs (UserID, Action, IPAddress)
-                    VALUES (@UserID, @Action, @IPAddress)";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlConnection connection = new SqlConnection(connectionString))
                     {
-                        command.Parameters.AddWithValue("@UserID", userId);
-                        command.Parameters.AddWithValue("@Action", action);
-                        command.Parameters.AddWithValue("@IPAddress", ipAddress ?? DB);
+                        connection.Open();
+                        string query = @"
+                        INSERT INTO ActionLogs (UserID, Action, IPAddress)
+                        VALUES (@UserID, @Action, @IPAddress)";
 
-                        command.ExecuteNonQuery();
+                        using (SqlCommand command = new SqlCommand(query, connection))
+                        {
+                            command.Parameters.AddWithValue("@UserID", userId);
+                            command.Parameters.AddWithValue("@Action", action);
+                            command.Parameters.AddWithValue("@IPAddress", ipAddress);
+
+                            command.ExecuteNonQuery();
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error logging action: {ex.Message}");
-                // You might also log this exception to a file or monitoring tool
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error logging action: {ex.Message}");
+                    // You might also log this exception to a file or monitoring tool
+                }
             }
         }
-    }
+    
 
+    private void Login_Load(object sender, EventArgs e)
+        {
 
-private void Login_Load(object sender, EventArgs e)
-    {
-
-    }
-
-    private void label3_Click(object sender, EventArgs e)
-    {
-
-    }
-
-    private void txtUsername_TextChanged(object sender, EventArgs e)
-    {
-
+        }
     }
 }
